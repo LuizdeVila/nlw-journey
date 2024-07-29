@@ -1,22 +1,26 @@
-import { ArrowRight, AtSign, Calendar, Mail, MapPin, Plus, Settings2, User, UserRoundPlus, X } from "lucide-react";
-import React from "react";
 import { FormEvent, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { InviteGuestsModal } from "./invite-guests-modal";
 import { ConfirmTripModal } from "./confirm-trip-modal";
 import { DestinationAndDateStep } from "./steps/destination-and-date-step";
 import { InviteGuestsStep } from "./steps/invite-guests-step";
+import { DateRange } from "react-day-picker";
+import { api } from "../../lib/axios";
 
 export function CreateTripPage() {
   const navigate = useNavigate()
-
   const [isGuestsInputOpen, setIsGuestsInputOpen] = useState(false)
   const [isGuestsModalOpen, setIsGuestsModalOpen] = useState(false)
   const [isConfirmTripModalOpen, setIsConfirmTripModalOpen] = useState(false)
   const [emailsToInvite, setEmailsToInvite] = useState([
-    'luiz@rocketseat.com.br',
-    'felipe@rocketseat.com'
+    'diego@rocketseat.com.br',
+    'john@acme.com'
   ])
+
+  const [destination, setDestination] = useState('')
+  const [ownerName, setOwnerName] = useState('')
+  const [ownerEmail, setOwnerEmail] = useState('')
+  const [eventStartAndEndDates, setEventStartAndEndDates] = useState<DateRange | undefined>()
 
   function openGuestsInput() {
     setIsGuestsInputOpen(true)
@@ -30,16 +34,16 @@ export function CreateTripPage() {
     setIsGuestsModalOpen(true)
   }
 
+  function closeGuestsModal() {
+    setIsGuestsModalOpen(false)
+  }
+
   function openConfirmTripModal() {
     setIsConfirmTripModalOpen(true)
   }
 
   function closeConfirmTripModal() {
     setIsConfirmTripModalOpen(false)
-  }
-
-  function closeGuestsModal() {
-    setIsGuestsModalOpen(false)
   }
 
   function addNewEmailToInvite(event: FormEvent<HTMLFormElement>) {
@@ -70,10 +74,46 @@ export function CreateTripPage() {
     setEmailsToInvite(newEmailList)
   }
 
-  function createTrip(event: FormEvent<HTMLFormElement>) {
-    event?.preventDefault
+  async function createTrip(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
 
-    navigate('/trips/123')
+    if (!destination) {
+      return
+    }
+
+    if (!eventStartAndEndDates?.from || !eventStartAndEndDates?.to) {
+      return
+    }
+
+    if (emailsToInvite.length === 0) {
+      return
+    }
+
+    if (!ownerName || !ownerEmail) {
+      return
+    }
+
+    console.log({
+      destination,
+      starts_at: eventStartAndEndDates.from,
+      ends_at: eventStartAndEndDates.to,
+      emails_to_invite: emailsToInvite,
+      owner_name: ownerName,
+      owner_email: ownerEmail
+    })
+
+    const response = await api.post('/trips', {
+      destination,
+      starts_at: eventStartAndEndDates.from,
+      ends_at: eventStartAndEndDates.to,
+      emails_to_invite: emailsToInvite,
+      owner_name: ownerName,
+      owner_email: ownerEmail
+    })
+
+    const { tripId } = response.data
+
+    navigate(`/trips/${tripId}`)
   }
 
   return (
@@ -88,16 +128,19 @@ export function CreateTripPage() {
 
         <div className="space-y-4">
           <DestinationAndDateStep
+            closeGuestsInput={closeGuestsInput}
             isGuestsInputOpen={isGuestsInputOpen}
             openGuestsInput={openGuestsInput}
-            closeGuestsInput={closeGuestsInput}
+            setDestination={setDestination}
+            setEventStartAndEndDates={setEventStartAndEndDates}
+            eventStartAndEndDates={eventStartAndEndDates}
           />
 
           {isGuestsInputOpen && (
             <InviteGuestsStep
-              openGuestsModal={openGuestsModal}
-              openConfirmTripModal={openConfirmTripModal}
               emailsToInvite={emailsToInvite}
+              openConfirmTripModal={openConfirmTripModal}
+              openGuestsModal={openGuestsModal}
             />
           )}
         </div>
@@ -108,71 +151,21 @@ export function CreateTripPage() {
         </p>
       </div>
 
-      { isGuestsModalOpen && (
+      {isGuestsModalOpen && (
         <InviteGuestsModal
           emailsToInvite={emailsToInvite}
           addNewEmailToInvite={addNewEmailToInvite}
-          removeEmailFromInvites={removeEmailFromInvites}
           closeGuestsModal={closeGuestsModal}
+          removeEmailFromInvites={removeEmailFromInvites}
         />
       )}
 
-      { isGuestsModalOpen && (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center">
-          <div className="w-[640px] rounded-xl py-5 px-6 shadow-shape bg-zinc-900 space-y-5">
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <h2 className="font-lg font-semibold">Selecionar convidados</h2>
-                <button>
-                  <X className="size-5 text-zinc-400" onClick={closeGuestsModal} />
-                </button>
-              </div>
-
-              <p className="text-sm text-zinc-400">
-                Os convidados irão receber e-mails para confirmar a participação na viagem.
-              </p>
-            </div>
-
-            <div className="flex flex-wrap gap-2">
-              {emailsToInvite.map(email => {
-                return (
-                  <div key={email} className="py-1.5 px-2.5 rounded-md bg-zinc-800 flex items-center gap-2">
-                    <span className="text-zinc-300">{email}</span>
-                    <button type="button">
-                      <X onClick={() => removeEmailFromInvites(email)} className="size-4 text-zinc-400" />
-                    </button>
-                  </div>
-                  )
-                }
-              )}
-            </div>
-
-            <div className="w-full h-px bg-zinc-800" />
-
-            <form onSubmit={addNewEmailToInvite} className="p-2.5 bg-zinc-950 border border-zinc-800 rounded-lg flex items-center gap-2">
-              <div className="px-2 flex items-center flex-1 gap-2">
-                <AtSign className="text-zinc-400 size-5" />
-                <input
-                  type="email"
-                  name="email"
-                  placeholder="Digite o email do convidado"
-                  className="bg-transparent text-lg placeholder-zinc-400 outline-none flex-1"
-                />
-              </div>
-
-              <button type="submit" className="bg-lime-300 text-lime-950 rounded-lg px-5 py-2 font-medium flex items-center gap-2 hover:bg-lime-400">
-                Convidar
-                <Plus className="size-5" />
-              </button>
-            </form>
-          </div>
-        </div>
-      )}
-
-      { isConfirmTripModalOpen && (
+      {isConfirmTripModalOpen && (
         <ConfirmTripModal
-          createTrip={createTrip}
           closeConfirmTripModal={closeConfirmTripModal}
+          createTrip={createTrip}
+          setOwnerName={setOwnerName}
+          setOwnerEmail={setOwnerEmail}
         />
       )}
     </div>
